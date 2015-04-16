@@ -13,17 +13,31 @@ function doInclude ($file, $tabIndex = '') {
 		$contents = $tabIndex . str_replace("\n", "\n" . $tabIndex, $contents);
 	}
 
-	$contents = preg_replace_callback('/(([\s\t]*)[a-z0-9]+):[\s]+\!include ([^\s]+)/i', 
+	$contents = preg_replace_callback('/(([\s\t]*)([a-z0-9_\/\-]+)):[\s]+\!include ([^\s]+)/i', 
 		function($matches) {
-			$property = $matches[1];
+			$property = $matches[3];
 			$spacing = $matches[2];
-			$file = $matches[3];
+			$file = $matches[4];
 			
 			if (!preg_match("/^((https?:\/\/)|\/)/i", $file)) {
 				$file = BASE_PATH . "/" . $file;
 			}
 			
-			return $spacing . $property . ":\n" . doInclude($file, $spacing . "  ");
+			$i = 0;
+			$cap = ": | \n";
+			$subContent = doInclude($file, $spacing . "    ");
+			$subLines = explode("\n", $subContent);
+			
+			while (isset($subLines[$i]) && !preg_match("/[^\s]/i", $subLines[$i])) {
+				$i++;
+			}
+			
+			if (strpos($subLines[$i], ':') && preg_match("/(:\s*('|\")(.+)('|\"))*/", $subLines[$i])) {
+				$cap = ":\n";
+			}			
+			
+			return $spacing . $property . $cap . $subContent;
+
 		}, 
 		$contents);
 			
