@@ -46,7 +46,7 @@ function doInclude ($file, $tabIndex = '') {
 
 
 $file = $argv[1];
-define(BASE_PATH, dirname($file));
+define('BASE_PATH', dirname($file));
 
 echo doInclude($file) . "\n\n\n\n# -----------\n# Merged with ramlMerge.php\n# http://www.mikestowe.com\n\n";
 ?>
