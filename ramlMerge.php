@@ -9,46 +9,63 @@ function doInclude ($folder, $file, $tabIndex = '') {
 	if ($tabIndex) {
 		$contents = $tabIndex . str_replace("\n", "\n" . $tabIndex, $contents);
 	}
+	
+	$lines = explode("\n", $contents);
+	$result = "";
+	foreach($lines as $line) {
+		$line = preg_replace_callback('/^(([ \t]*)([^#\n]+)[ \t]*[ \t]*)\!include ((.+)\/([^\s]+))$/i', 
+			function($matches) use ($folder) {
+				$pre = $matches[1];
+				$spacing = $matches[2];
+				$resource = $matches[4];
+				$containerFolder = $matches[5];
+				$file = $matches[6];
+				$cap = " \n";
+								
+				// Resolve where the included file is
+				if (!preg_match("/^((https?:\/\/)|\/)/i", $file)) {
+					// File resource
+					$containerFolder = realpath($folder . "/" . $containerFolder);
+					$file = realpath($containerFolder . "/" . $file);
+				} else {
+					// URL resource
+					$containerFolder = $folder;
+					$file = $resource;
+				}
+				
+				// Load
+				$subContent = doInclude($containerFolder, $file, $spacing . "    ");
+				
+				// Add proper connector to included file
+				if (requiresPipe($pre, $subContent)) {
+					$cap = "| \n";
+				}
+				
+				// Join				
+				return $pre . $cap . $subContent;
+			}, 
+			$line);
 
-	$contents = preg_replace_callback('/(([ \t]*)([a-z0-9_\/\-]+)):[\s]+\!include ((.+)\/([^\s]+))/i', 
-		function($matches) use ($folder) {
-			$property = $matches[3];
-			$spacing = $matches[2];
-			$resource = $matches[4];
-			$containerFolder = $matches[5];
-			$file = $matches[6];
-			
-			if (!preg_match("/^((https?:\/\/)|\/)/i", $file)) {
-				// File resource
-				$containerFolder = realpath($folder . "/" . $containerFolder);
-				$file = realpath($containerFolder . "/" . $file);
-			} else {
-				// URL resource
-				$containerFolder = $folder;
-				$file = $resource;
-			}
-			
-			$i = 0;
-			$cap = ": | \n";
-			$subContent = doInclude($containerFolder, $file, $spacing . "    ");
-			$subLines = explode("\n", $subContent);
-			
-			while (isset($subLines[$i]) && !preg_match("/[^\s]/i", $subLines[$i])) {
-				$i++;
-			}
-			
-			if (strpos($subLines[$i], ':') && preg_match("/(:\s*('|\")(.+)('|\"))*/", $subLines[$i])) {
-				$cap = ":\n";
-			}			
-			
-			return $spacing . $property . $cap . $subContent;
-
-		}, 
-		$contents);
-			
-	return $contents;
+		$result .= $line . "\n";
+	}
+	return $result;
 }
 
+function requiresPipe($pre, $subContent) {
+	if (strpos($pre, "example") || strpos($pre, "scheme") || strpos($pre, "content")) {
+		return true;
+	} else {
+		$i = 0;
+		$subLines = explode("\n", $subContent);
+		while (isset($subLines[$i]) && !preg_match("/[^\s]/i", $subLines[$i])) {
+			$i++;
+		}
+		if (strpos($subLines[$i], '{')) {
+			return true;
+		}	
+	}
+	return false;
+}
 
 $file = $argv[1];
 
