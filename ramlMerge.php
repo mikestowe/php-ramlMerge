@@ -1,52 +1,73 @@
 <?php
-function doInclude ($file, $tabIndex = '') {
+function doInclude ($folder, $file, $tabIndex = '') {
 	$contents = @file_get_contents($file);
-	if (!$contents) {
-		$contents = @file_get_contents(BASE_PATH . $file);
-	}
 	
 	if (!$contents) {
-		return "\n\n# Unable to Include" . $file . "\n\n";
+		return "\n\n# Unable to include " . $file . "\n\n";
 	}
 	
 	if ($tabIndex) {
 		$contents = $tabIndex . str_replace("\n", "\n" . $tabIndex, $contents);
 	}
+	
+	$lines = explode("\n", $contents);
+	$result = "";
+	foreach($lines as $line) {
+		$line = preg_replace_callback('/^(([ \t]*)([^#\n]+)[ \t]*[ \t]*)\!include ((.+)\/([^\s]+))$/i', 
+			function($matches) use ($folder) {
+				$pre = $matches[1];
+				$spacing = $matches[2];
+				$resource = $matches[4];
+				$containerFolder = $matches[5];
+				$file = $matches[6];
+				$cap = " \n";
+								
+				// Resolve where the included file is
+				if (!preg_match("/^((https?:\/\/)|\/)/i", $file)) {
+					// File resource
+					$containerFolder = realpath($folder . "/" . $containerFolder);
+					$file = realpath($containerFolder . "/" . $file);
+				} else {
+					// URL resource
+					$containerFolder = $folder;
+					$file = $resource;
+				}
+				
+				// Load
+				$subContent = doInclude($containerFolder, $file, $spacing . "    ");
+				
+				// Add proper connector to included file
+				if (requiresPipe($pre, $subContent)) {
+					$cap = "| \n";
+				}
+				
+				// Join				
+				return $pre . $cap . $subContent;
+			}, 
+			$line);
 
-	$contents = preg_replace_callback('/(([\s\t]*)([a-z0-9_\/\-]+)):[\s]+\!include ([^\s]+)/i', 
-		function($matches) {
-			$property = $matches[3];
-			$spacing = $matches[2];
-			$file = $matches[4];
-			
-			if (!preg_match("/^((https?:\/\/)|\/)/i", $file)) {
-				$file = BASE_PATH . "/" . $file;
-			}
-			
-			$i = 0;
-			$cap = ": | \n";
-			$subContent = doInclude($file, $spacing . "    ");
-			$subLines = explode("\n", $subContent);
-			
-			while (isset($subLines[$i]) && !preg_match("/[^\s]/i", $subLines[$i])) {
-				$i++;
-			}
-			
-			if (strpos($subLines[$i], ':') && preg_match("/(:\s*('|\")(.+)('|\"))*/", $subLines[$i])) {
-				$cap = ":\n";
-			}			
-			
-			return $spacing . $property . $cap . $subContent;
-
-		}, 
-		$contents);
-			
-	return $contents;
+		$result .= $line . "\n";
+	}
+	return $result;
 }
 
+function requiresPipe($pre, $subContent) {
+	if (strpos($pre, "example") || strpos($pre, "scheme") || strpos($pre, "content")) {
+		return true;
+	} else {
+		$i = 0;
+		$subLines = explode("\n", $subContent);
+		while (isset($subLines[$i]) && !preg_match("/[^\s]/i", $subLines[$i])) {
+			$i++;
+		}
+		if (strpos($subLines[$i], '{')) {
+			return true;
+		}	
+	}
+	return false;
+}
 
 $file = $argv[1];
-define('BASE_PATH', dirname($file));
 
-echo doInclude($file) . "\n\n\n\n# -----------\n# Merged with ramlMerge.php\n# http://www.mikestowe.com\n\n";
+echo doInclude(dirname($file), $file) . "\n\n\n\n# -----------\n# Merged with ramlMerge.php\n# http://www.mikestowe.com\n\n";
 ?>
