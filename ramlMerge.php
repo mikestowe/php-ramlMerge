@@ -13,7 +13,7 @@ function doInclude ($file, $tabIndex = '') {
 		$contents = $tabIndex . str_replace("\n", "\n" . $tabIndex, $contents);
 	}
 
-	$contents = preg_replace_callback('/(([\s\t]*)([a-z0-9_\/\-]+)):[\s]+\!include ([^\s]+)/i', 
+	$contents = preg_replace_callback('/(([ \t]*)([a-z0-9_\/\-]+)):[\s]+\!include ([^\s]+)/i',
 		function($matches) {
 			$property = $matches[3];
 			$spacing = $matches[2];
